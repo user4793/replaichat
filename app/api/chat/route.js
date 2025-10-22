@@ -3,37 +3,33 @@ import { NextResponse } from "next/server";
 export async function POST(req) {
   const body = await req.json().catch(() => null);
   if (!body?.message || !body?.slug) {
-    return NextResponse.json({ error: "Missing slug or message" }, { status: 400 });
+    return NextResponse.json({ reply: "Missing details. Try again?" }, { status: 200 });
   }
 
-  // For now, just echo back. We’ll point this to n8n after deploy.
-  // When you’re ready, set N8N_WEBHOOK_URL in Vercel and uncomment the fetch below.
-
-  const url = process.env.N8N_WEBHOOK_URL;   // e.g. https://n8n.replai.com/webhook/chat
-  const secret = process.env.N8N_PUBLIC_SECRET || ""; // optional
+  const url = process.env.N8N_WEBHOOK_URL;
+  const secret = process.env.N8N_PUBLIC_SECRET || "";
 
   if (!url) {
-    // local fallback so you can see it working right away
-    return NextResponse.json({ reply: `Hi ${body.slug} — you said: "${body.message}"` });
+    // simple canned demo without n8n
+    const lower = body.message.toLowerCase();
+    if (lower.includes("hello") || lower.includes("hi")) {
+      return NextResponse.json({ reply: `Hello! I’m ${body.slug}’s assistant. What can I do for you?` });
+    }
+    if (lower.includes("book")) {
+      return NextResponse.json({ reply: "Sure — what day and time should I book?" });
+    }
+    return NextResponse.json({ reply: `You said: “${body.message}”. (Connect n8n to customize this.)` });
   }
 
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-REPLAI-SECRET": secret
-      },
-      body: JSON.stringify({
-        slug: body.slug,
-        message: body.message,
-        conversation_id: body.conversation_id || null
-      })
+      headers: { "Content-Type": "application/json", "X-REPLAI-SECRET": secret },
+      body: JSON.stringify({ slug: body.slug, message: body.message, conversation_id: body.conversation_id || null })
     });
-
     const data = await res.json().catch(async () => ({ reply: await res.text() }));
     return NextResponse.json({ reply: data?.reply ?? "" });
   } catch {
-    return NextResponse.json({ error: "n8n error" }, { status: 502 });
+    return NextResponse.json({ reply: "Upstream error. Please try again." }, { status: 200 });
   }
 }
